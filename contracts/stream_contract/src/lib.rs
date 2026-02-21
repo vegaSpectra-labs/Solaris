@@ -68,7 +68,14 @@ pub struct StreamContract;
 
 #[contractimpl]
 impl StreamContract {
-    pub fn create_stream(env: Env, sender: Address, recipient: Address, rate: i128, token_address: Address) {
+    pub fn create_stream(
+        env: Env,
+        sender: Address,
+        recipient: Address,
+        token_address: Address,
+        amount: i128,
+        duration: u64,
+    ) -> u64 {
         sender.require_auth();
         // Placeholder for stream creation logic
         // 1. Transfer tokens to contract
@@ -92,8 +99,20 @@ impl StreamContract {
         );
     }
 
-    pub fn withdraw(env: Env, recipient: Address, stream_id: u64) {
-        recipient.require_auth();
+    fn get_next_stream_id(env: &Env) -> u64 {
+        let counter: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::StreamCounter)
+            .unwrap_or(0);
+        let next_id = counter + 1;
+        env.storage()
+            .instance()
+            .set(&DataKey::StreamCounter, &next_id);
+        next_id
+    }
+
+    pub fn withdraw(_env: Env, _recipient: Address, _stream_id: u64) {
         // Placeholder for withdraw logic
         // 1. Calculate claimable amount based on time delta
         // 2. Transfer tokens to recipient
@@ -237,6 +256,10 @@ impl StreamContract {
         storage.set(&stream_key, &stream);
 
         Ok(())
+    }
+
+    pub fn get_stream(env: Env, stream_id: u64) -> Option<Stream> {
+        env.storage().instance().get(&DataKey::Stream(stream_id))
     }
 }
 
