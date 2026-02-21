@@ -3,8 +3,12 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
 import streamRoutes from './routes/stream.routes.js';
+import { globalRateLimiter } from './middleware/rate-limiter.middleware.js';
 
 const app = express();
+
+// Apply global rate limiter first
+app.use(globalRateLimiter);
 
 app.use(cors());
 app.use(express.json());
