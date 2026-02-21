@@ -261,6 +261,10 @@ impl StreamContract {
     pub fn get_stream(env: Env, stream_id: u64) -> Option<Stream> {
         env.storage().instance().get(&DataKey::Stream(stream_id))
     }
+
+    pub fn get_stream(env: Env, stream_id: u64) -> Option<Stream> {
+        env.storage().instance().get(&DataKey::Stream(stream_id))
+    }
 }
 
 mod test;
