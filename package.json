@@ -18,5 +18,8 @@
     "frontend/**/*.{ts,tsx,js,jsx}": [
       "npm run lint --workspace=frontend --"
     ]
+  },
+  "dependencies": {
+    "react-hot-toast": "^2.6.0"
   }
 }

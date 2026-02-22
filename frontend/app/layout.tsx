@@ -5,7 +5,10 @@ import React from "react";
 import "./globals.css";
 import { WalletProvider } from "@/context/wallet-context";
 import Link from "next/link";
+
+import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/context/theme-provider";
+
 
 const sora = Sora({
   variable: "--font-display",
@@ -61,10 +64,43 @@ export default function RootLayout({
                   </Link>
                 </nav>
               </div>
+
+              <nav className="flex gap-6">
+                <Link
+                  href="/"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 transition-colors"
+                >
+                  Outgoing
+                </Link>
+                <Link
+                  href="/incoming"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 transition-colors"
+                >
+                  Incoming
+                </Link>
+              </nav>
+            </div>
+          </header>
+          {children}
+        </WalletProvider>
+        <Toaster
+               position="top-right"
+               toastOptions={{
+               duration: 4000,
+               style: {
+                  background: "#111",
+                  color: "#fff",
+                  border: "1px solid #333",
+                  borderRadius: "12px",
+    },
+  }}
+/>
+
             </header>
             {children}
           </WalletProvider>
         </ThemeProvider>
+
       </body>
     </html>
   );
