@@ -18,6 +18,7 @@ Please read this document carefully before opening a Pull Request.
 * [Branching Strategy](#branching-strategy)
 * [Commit Guidelines & Hooks](#commit-guidelines--hooks)
 * [Pull Request Process](#pull-request-process)
+* [Security](#security)
 * [Code of Conduct](#code-of-conduct)
 
 ---
@@ -266,6 +267,14 @@ Maintainers may:
 * Suggest improvements
 
 Please respond respectfully and update your branch as requested.
+
+---
+
+# 🔒 Security
+
+If you discover a security vulnerability, please do **NOT** open a public issue. Instead, follow our responsible disclosure process outlined in our [Security Policy](SECURITY.md).
+
+Security vulnerabilities should be reported privately to allow us to address them before public disclosure.
 
 ---
 

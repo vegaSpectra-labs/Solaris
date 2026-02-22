@@ -87,6 +87,10 @@ cargo build --target wasm32-unknown-unknown --release
 
 Contributions are welcome! Please fork the repository and submit a pull request.
 
+## Security
+
+If you discover a security vulnerability, please see our [Security Policy](SECURITY.md) for information on how to report it responsibly.
+
 ## Contributors
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->

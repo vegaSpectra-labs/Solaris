@@ -2,13 +2,15 @@
   "name": "flowfi",
   "version": "1.0.0",
   "description": "DeFi Payment Streaming on Stellar",
+  "type": "module",
   "private": true,
   "workspaces": [
     "frontend",
     "backend"
   ],
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "verify-security": "node scripts/verify-security-setup.js"
   },
   "devDependencies": {
     "husky": "^9.1.7",
