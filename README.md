@@ -101,7 +101,17 @@ The FlowFi backend API uses URL-based versioning. All endpoints are prefixed wit
 
 - **API Versioning Guide**: [backend/docs/API_VERSIONING.md](backend/docs/API_VERSIONING.md)
 - **Deprecation Policy**: [backend/docs/DEPRECATION_POLICY.md](backend/docs/DEPRECATION_POLICY.md)
+- **Sandbox Mode**: [backend/docs/SANDBOX_MODE.md](backend/docs/SANDBOX_MODE.md) - Test without affecting production data
 - **API Docs**: Available at `http://localhost:3001/api-docs` when backend is running
+
+### Sandbox Mode
+
+FlowFi supports sandbox mode for safe testing. Enable it by:
+
+1. Setting `SANDBOX_MODE_ENABLED=true` in your `.env` file
+2. Adding `X-Sandbox-Mode: true` header or `?sandbox=true` query parameter to requests
+
+Sandbox mode uses a separate database and clearly labels all responses. See [Sandbox Mode Documentation](backend/docs/SANDBOX_MODE.md) for details.
 
 ## Contributing
 

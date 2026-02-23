@@ -13,6 +13,26 @@ const router = Router();
  *     description: |
  *       Creates a new payment stream. This endpoint indexes the stream intention.
  *       The actual stream creation happens on-chain via Soroban smart contracts.
+ *       
+ *       **Sandbox Mode:**
+ *       - Add header `X-Sandbox-Mode: true` or query parameter `?sandbox=true`
+ *       - Sandbox responses include `_sandbox` metadata
+ *       - Sandbox data is stored in a separate database
+ *     parameters:
+ *       - in: header
+ *         name: X-Sandbox-Mode
+ *         schema:
+ *           type: string
+ *           enum: ["true", "1"]
+ *         description: Enable sandbox mode for testing
+ *         required: false
+ *       - in: query
+ *         name: sandbox
+ *         schema:
+ *           type: string
+ *           enum: ["true", "1"]
+ *         description: Enable sandbox mode via query parameter
+ *         required: false
  *     requestBody:
  *       required: true
  *       content:
