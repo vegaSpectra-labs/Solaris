@@ -232,6 +232,10 @@ impl StreamContract {
     ) -> u64 {
         sender.require_auth();
 
+        if Self::is_emergency_mode(env.clone()) {
+            panic_with_error!(&env, StreamError::EmergencyStopEnabled);
+        }
+
         if amount <= 0 || duration == 0 {
             panic_with_error!(&env, StreamError::InvalidAmount);
         }
@@ -385,6 +389,10 @@ impl StreamContract {
         amount: i128,
     ) -> Result<(), StreamError> {
         sender.require_auth();
+
+        if Self::is_emergency_mode(env.clone()) {
+            return Err(StreamError::EmergencyStopEnabled);
+        }
 
         if amount <= 0 {
             return Err(StreamError::InvalidAmount);
