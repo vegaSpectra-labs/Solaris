@@ -2,9 +2,9 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
-import streamRoutes from './routes/stream.routes.js';
-import eventsRoutes from './routes/events.routes.js';
+import { apiVersionMiddleware } from './middleware/api-version.middleware.js';
 import { globalRateLimiter } from './middleware/rate-limiter.middleware.js';
+import v1Routes from './routes/v1/index.js';
 
 const app = express();
 
@@ -26,9 +26,40 @@ app.get('/api-docs.json', (req: Request, res: Response) => {
     res.send(swaggerSpec);
 });
 
-// Routes
-app.use('/streams', streamRoutes);
-app.use('/events', eventsRoutes);
+// API Versioning
+// All versioned routes must include version prefix (e.g., /v1/streams)
+app.use(apiVersionMiddleware);
+
+// Versioned API routes
+app.use('/v1', v1Routes);
+
+// Legacy routes (deprecated - redirect to v1)
+// These will be removed in a future version
+app.use('/streams', (req: Request, res: Response, next) => {
+    res.status(410).json({
+        error: 'Deprecated endpoint',
+        message: 'This endpoint has been deprecated. Please use /v1/streams instead.',
+        deprecated: true,
+        migration: {
+            old: '/streams',
+            new: '/v1/streams',
+        },
+        sunsetDate: '2024-12-31',
+    });
+});
+
+app.use('/events', (req: Request, res: Response, next) => {
+    res.status(410).json({
+        error: 'Deprecated endpoint',
+        message: 'This endpoint has been deprecated. Please use /v1/events instead.',
+        deprecated: true,
+        migration: {
+            old: '/events',
+            new: '/v1/events',
+        },
+        sunsetDate: '2024-12-31',
+    });
+});
 
 /**
  * @openapi
@@ -81,6 +112,17 @@ app.get('/', (req: Request, res: Response) => {
  *                 version:
  *                   type: string
  *                   example: 1.0.0
+ *                 apiVersions:
+ *                   type: object
+ *                   properties:
+ *                     supported:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       example: ["v1"]
+ *                     default:
+ *                       type: string
+ *                       example: "v1"
  */
 app.get('/health', (req: Request, res: Response) => {
     res.json({
@@ -88,6 +130,10 @@ app.get('/health', (req: Request, res: Response) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         version: '1.0.0',
+        apiVersions: {
+            supported: ['v1'],
+            default: 'v1',
+        },
     });
 });
 

@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { createStreamSchema } from '../validators/stream.validator.js';
 import { sseService } from '../services/sse.service.js';
 

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { subscribe } from '../controllers/sse.controller.js';
-import { sseService } from '../services/sse.service.js';
+import { subscribe } from '../../controllers/sse.controller.js';
+import { sseService } from '../../services/sse.service.js';
 
 const router = Router();
 
 /**
  * @openapi
- * /events/subscribe:
+ * /v1/events/subscribe:
  *   get:
  *     tags:
  *       - Events
@@ -63,7 +63,7 @@ router.get('/subscribe', subscribe);
 
 /**
  * @openapi
- * /events/stats:
+ * /v1/events/stats:
  *   get:
  *     tags:
  *       - Events

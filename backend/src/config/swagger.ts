@@ -18,12 +18,12 @@ const options: swaggerJsdoc.Options = {
     },
     servers: [
       {
-        url: 'http://localhost:3001',
-        description: 'Development server',
+        url: 'http://localhost:3001/v1',
+        description: 'Development server (v1)',
       },
       {
-        url: 'https://api.flowfi.io',
-        description: 'Production server',
+        url: 'https://api.flowfi.io/v1',
+        description: 'Production server (v1)',
       },
     ],
     tags: [
