@@ -2,7 +2,7 @@
 
 **DeFi Payment Streaming on Stellar**
 
-*Programmable, real-time payment streams and recurring subscriptions.*
+_Programmable, real-time payment streams and recurring subscriptions._
 
 ## Overview
 
@@ -54,20 +54,24 @@ docker compose up --build
 ```
 
 This starts:
+
 - **Postgres** database on port `5432`
 - **Backend** API on port `3001`
 
 To run in detached mode:
+
 ```bash
 docker compose up -d --build
 ```
 
 To stop the services:
+
 ```bash
 docker compose down
 ```
 
 To reset the database:
+
 ```bash
 docker compose down -v
 ```
@@ -157,6 +161,7 @@ Or open `backend/test-sse-client.html` directly in a browser.
 ## Contributing
 
 Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for:
+
 - Local development setup instructions
 - Code style and commit guidelines
 - Pull request process
@@ -167,6 +172,15 @@ For architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ## Security
 
 If you discover a security vulnerability, please see our [Security Policy](SECURITY.md) for information on how to report it responsibly.
+
+## Community & Support
+
+Have questions? Want to share ideas or projects? Join the conversation!
+
+- **❓ [Ask Questions](https://github.com/flowfi/flowfi/discussions/categories/q-a)** - Get help in GitHub Discussions Q&A
+- **💡 [Share Ideas](https://github.com/flowfi/flowfi/discussions/categories/ideas)** - Propose features and discuss improvements
+- **🎪 [Show and Tell](https://github.com/flowfi/flowfi/discussions/categories/show-and-tell)** - Share projects and use cases built with FlowFi
+- **📖 [Discussions Guide](DISCUSSIONS.md)** - Learn when to use Discussions vs Issues
 
 ## Contributors
 
