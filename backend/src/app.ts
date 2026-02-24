@@ -141,7 +141,7 @@ app.get('/', (req: Request, res: Response) => {
 app.get('/health', async (req: Request, res: Response) => {
     const { getSandboxConfig } = await import('./config/sandbox.js');
     const sandboxConfig = getSandboxConfig();
-    
+
     res.json({
         status: 'healthy',
         timestamp: new Date().toISOString(),
@@ -157,5 +157,9 @@ app.get('/health', async (req: Request, res: Response) => {
         },
     });
 });
+
+import { errorHandler } from './middleware/error.middleware.js';
+
+app.use(errorHandler);
 
 export default app;
