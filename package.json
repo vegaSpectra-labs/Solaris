@@ -9,7 +9,7 @@
     "backend"
   ],
   "scripts": {
-    "prepare": "husky",
+    "prepare": "husky || true",
     "verify-security": "node scripts/verify-security-setup.js"
   },
   "devDependencies": {
