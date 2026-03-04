@@ -79,6 +79,9 @@ jobs:
         run: npm run build
         working-directory: backend
 
+      - name: Install Rollup Native Binding
+        run: npm install @rollup/rollup-linux-x64-gnu --no-save
+
       - name: Run Backend Tests
         run: |
           ls -la src/generated/prisma
