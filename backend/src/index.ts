@@ -27,7 +27,7 @@ const startServer = async () => {
     await startWorkers();
 
     // Graceful shutdown: stop workers (and indexer) before closing the HTTP server.
-    const shutdown = (signal) => {
+    const shutdown = (signal: string) => {
       logger.info(`Received ${signal}. Shutting down gracefully...`);
       try {
         // Prefer a stop() if your service exposes it; otherwise remove this.
