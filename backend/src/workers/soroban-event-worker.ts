@@ -85,7 +85,7 @@ export class SorobanEventWorker {
   private readonly startLedger: number;
 
   private isRunning = false;
-  private pollTimer?: NodeJS.Timeout;
+  private pollTimer: NodeJS.Timeout | undefined;
 
   constructor() {
     const rpcUrl =
