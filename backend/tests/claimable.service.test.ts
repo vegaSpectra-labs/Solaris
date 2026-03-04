@@ -113,9 +113,10 @@ describe('ClaimableAmountService', () => {
 
   it('saturates overflow-safe multiplication to i128 max', () => {
     const i128Max = ((1n << 127n) - 1n).toString();
+    // nowMs is in milliseconds; to get calculatedAt=1000 seconds, pass 1_000_000 ms
     const service = new ClaimableAmountService({
       cacheTtlMs: 5_000,
-      nowMs: () => 1_000,
+      nowMs: () => 1_000_000,
     });
 
     const result = service.getClaimableAmount({
@@ -127,8 +128,11 @@ describe('ClaimableAmountService', () => {
       isActive: true,
     });
 
-    // elapsed=2 => streamed overflows i128, saturates to i128 max
-    // remaining=i128 max => claimable=i128 max
+    // calculatedAt = floor(1_000_000 / 1000) = 1000
+    // elapsed = 1000 - 998 = 2
+    // streamed = 2 * i128Max => overflows, saturated to i128 max
+    // remaining = i128Max - 0 = i128Max
+    // claimable = min(i128Max, i128Max) = i128Max
     expect(result.claimableAmount).toBe(i128Max);
     expect(result.actionable).toBe(true);
   });

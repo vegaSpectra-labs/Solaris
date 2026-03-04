@@ -98,6 +98,9 @@ describe('POST /v1/streams', () => {
   });
 
   it('should return 410 for deprecated unversioned endpoint', async () => {
+    // Reset mocks so error middleware isn't caught by the mock setup
+    vi.resetAllMocks();
+
     const response = await request(app)
       .post('/streams')
       .send({})
