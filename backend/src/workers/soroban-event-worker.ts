@@ -180,7 +180,8 @@ export class SorobanEventWorker {
 
       try {
         await this.processEvent(event);
-        lastCursor = event.pagingToken;
+        // Use the event ID as the cursor if pagingToken is not available
+        lastCursor = event.id;
         lastLedger = event.ledger;
       } catch (err) {
         logger.error(
@@ -191,14 +192,17 @@ export class SorobanEventWorker {
       }
     }
 
+    // Use the response's final cursor if provided, otherwise the last event's ID
+    const finalCursor = (response as any).latestCursor || lastCursor;
+
     await prisma.indexerState.upsert({
       where: { id: INDEXER_STATE_ID },
       create: {
         id: INDEXER_STATE_ID,
         lastLedger,
-        lastCursor,
+        lastCursor: finalCursor,
       },
-      update: { lastLedger, lastCursor },
+      update: { lastLedger, lastCursor: finalCursor },
     });
 
     logger.info(
@@ -215,7 +219,6 @@ export class SorobanEventWorker {
   ): Promise<void> {
     if (!event.topic || event.topic.length < 2) return;
 
-    // Explicit variable assignment avoids `noUncheckedIndexedAccess` errors.
     const topic0: xdr.ScVal | undefined = event.topic[0];
     const topic1: xdr.ScVal | undefined = event.topic[1];
     if (!topic0 || !topic1) return;
@@ -243,12 +246,6 @@ export class SorobanEventWorker {
 
   // ─── Event Handlers ────────────────────────────────────────────────────────
 
-  /**
-   * StreamCreatedEvent
-   * Topics : [Symbol("stream_created"), U64(stream_id)]
-   * Body   : Map { stream_id, sender, recipient, rate_per_second,
-   *                token_address, deposited_amount, start_time }
-   */
   private async handleStreamCreated(
     event: rpc.Api.EventResponse,
     streamIdTopic: xdr.ScVal,
@@ -275,7 +272,6 @@ export class SorobanEventWorker {
     const startTime = Number(decodeU64(body['start_time']));
 
     await prisma.$transaction(async (tx: any) => {
-      // Ensure both wallet accounts exist in the Users table.
       await tx.user.upsert({
         where: { publicKey: sender },
         create: { publicKey: sender },
@@ -287,7 +283,6 @@ export class SorobanEventWorker {
         update: {},
       });
 
-      // Create or re-sync the stream record.
       await tx.stream.upsert({
         where: { streamId },
         create: {
@@ -336,15 +331,8 @@ export class SorobanEventWorker {
       transactionHash: event.txHash,
       ledger: event.ledger,
     });
-
-    logger.info(`[SorobanWorker] StreamCreated — stream #${streamId}`);
   }
 
-  /**
-   * StreamToppedUpEvent
-   * Topics : [Symbol("stream_topped_up"), U64(stream_id)]
-   * Body   : Map { stream_id, sender, amount, new_deposited_amount }
-   */
   private async handleStreamToppedUp(
     event: rpc.Api.EventResponse,
     streamIdTopic: xdr.ScVal,
@@ -390,17 +378,8 @@ export class SorobanEventWorker {
       ledger: event.ledger,
       timestamp,
     });
-
-    logger.info(
-      `[SorobanWorker] StreamToppedUp — stream #${streamId}, amount: ${amount}`,
-    );
   }
 
-  /**
-   * TokensWithdrawnEvent
-   * Topics : [Symbol("tokens_withdrawn"), U64(stream_id)]
-   * Body   : Map { stream_id, recipient, amount, timestamp }
-   */
   private async handleTokensWithdrawn(
     event: rpc.Api.EventResponse,
     streamIdTopic: xdr.ScVal,
@@ -417,7 +396,6 @@ export class SorobanEventWorker {
     const timestamp = Number(decodeU64(body['timestamp']));
 
     await prisma.$transaction(async (tx: any) => {
-      // Accumulate the withdrawn total.
       const stream = await tx.stream.findUniqueOrThrow({
         where: { streamId },
         select: { withdrawnAmount: true },
@@ -456,18 +434,8 @@ export class SorobanEventWorker {
       ledger: event.ledger,
       timestamp,
     });
-
-    logger.info(
-      `[SorobanWorker] TokensWithdrawn — stream #${streamId}, amount: ${amount}`,
-    );
   }
 
-  /**
-   * StreamCancelledEvent
-   * Topics : [Symbol("stream_cancelled"), U64(stream_id)]
-   * Body   : Map { stream_id, sender, recipient, amount_withdrawn,
-   *                refunded_amount }
-   */
   private async handleStreamCancelled(
     event: rpc.Api.EventResponse,
     streamIdTopic: xdr.ScVal,
@@ -514,329 +482,6 @@ export class SorobanEventWorker {
       ledger: event.ledger,
       timestamp,
     });
-
-    logger.info(`[SorobanWorker] StreamCancelled — stream #${streamId}`);
-  }
-}
-
-export const sorobanEventWorker = new SorobanEventWorker();
-
-
-logger.info(
-  `[SorobanWorker] Processed ${response.events.length} event(s) — latest ledger: ${lastLedger}`,
-);
-  }
-
-  /**
-   * Dispatch a single contract event to the appropriate handler based on the
-   * first topic symbol.
-   */
-  private async processEvent(
-  event: SorobanRpc.Api.EventResponse,
-): Promise < void> {
-  if(!event.topic || event.topic.length < 2) return;
-
-  // Explicit variable assignment avoids `noUncheckedIndexedAccess` errors.
-  const topic0: xdr.ScVal | undefined = event.topic[0];
-  const topic1: xdr.ScVal | undefined = event.topic[1];
-  if(!topic0 || !topic1) return;
-
-const eventName = decodeSymbol(topic0);
-
-switch (eventName) {
-  case 'stream_created':
-    await this.handleStreamCreated(event, topic1);
-    break;
-  case 'stream_topped_up':
-    await this.handleStreamToppedUp(event, topic1);
-    break;
-  case 'tokens_withdrawn':
-    await this.handleTokensWithdrawn(event, topic1);
-    break;
-  case 'stream_cancelled':
-    await this.handleStreamCancelled(event, topic1);
-    break;
-  default:
-    // Unrecognised event — ignore silently.
-    break;
-}
-  }
-
-  // ─── Event Handlers ────────────────────────────────────────────────────────
-
-  /**
-   * StreamCreatedEvent
-   * Topics : [Symbol("stream_created"), U64(stream_id)]
-   * Body   : Map { stream_id, sender, recipient, rate_per_second,
-   *                token_address, deposited_amount, start_time }
-   */
-  private async handleStreamCreated(
-  event: SorobanRpc.Api.EventResponse,
-  streamIdTopic: xdr.ScVal,
-): Promise < void> {
-  const streamId = Number(decodeU64(streamIdTopic));
-  const body = decodeMap(event.value);
-
-  if(
-      !body['sender'] ||
-  !body['recipient'] ||
-  !body['token_address'] ||
-  !body['rate_per_second'] ||
-  !body['deposited_amount'] ||
-  !body['start_time']
-    ) {
-  throw new Error(`StreamCreated #${streamId}: missing body fields`);
-}
-
-const sender = decodeAddress(body['sender']);
-const recipient = decodeAddress(body['recipient']);
-const tokenAddress = decodeAddress(body['token_address']);
-const ratePerSecond = decodeI128(body['rate_per_second']);
-const depositedAmount = decodeI128(body['deposited_amount']);
-const startTime = Number(decodeU64(body['start_time']));
-
-await prisma.$transaction(async (tx: any) => {
-  // Ensure both wallet accounts exist in the Users table.
-  await tx.user.upsert({
-    where: { publicKey: sender },
-    create: { publicKey: sender },
-    update: {},
-  });
-  await tx.user.upsert({
-    where: { publicKey: recipient },
-    create: { publicKey: recipient },
-    update: {},
-  });
-
-  // Create or re-sync the stream record.
-  await tx.stream.upsert({
-    where: { streamId },
-    create: {
-      streamId,
-      sender,
-      recipient,
-      tokenAddress,
-      ratePerSecond,
-      depositedAmount,
-      withdrawnAmount: '0',
-      startTime,
-      lastUpdateTime: startTime,
-      isActive: true,
-    },
-    update: {
-      tokenAddress,
-      ratePerSecond,
-      depositedAmount,
-      startTime,
-      lastUpdateTime: startTime,
-      isActive: true,
-    },
-  });
-
-  await tx.streamEvent.create({
-    data: {
-      streamId,
-      eventType: 'CREATED',
-      amount: depositedAmount,
-      transactionHash: event.txHash,
-      ledgerSequence: event.ledger,
-      timestamp: startTime,
-      metadata: JSON.stringify({ tokenAddress, ratePerSecond }),
-    },
-  });
-});
-
-sseService.broadcastToStream(String(streamId), 'stream.created', {
-  streamId,
-  sender,
-  recipient,
-  tokenAddress,
-  ratePerSecond,
-  depositedAmount,
-  startTime,
-  transactionHash: event.txHash,
-  ledger: event.ledger,
-});
-
-logger.info(`[SorobanWorker] StreamCreated — stream #${streamId}`);
-  }
-
-  /**
-   * StreamToppedUpEvent
-   * Topics : [Symbol("stream_topped_up"), U64(stream_id)]
-   * Body   : Map { stream_id, sender, amount, new_deposited_amount }
-   */
-  private async handleStreamToppedUp(
-  event: SorobanRpc.Api.EventResponse,
-  streamIdTopic: xdr.ScVal,
-): Promise < void> {
-  const streamId = Number(decodeU64(streamIdTopic));
-  const body = decodeMap(event.value);
-
-  if(!body['amount'] || !body['new_deposited_amount']) {
-  throw new Error(`StreamToppedUp #${streamId}: missing body fields`);
-}
-
-const amount = decodeI128(body['amount']);
-const newDepositedAmount = decodeI128(body['new_deposited_amount']);
-const timestamp = Math.floor(Date.now() / 1000);
-
-await prisma.$transaction(async (tx: any) => {
-  await tx.stream.update({
-    where: { streamId },
-    data: {
-      depositedAmount: newDepositedAmount,
-      lastUpdateTime: timestamp,
-    },
-  });
-
-  await tx.streamEvent.create({
-    data: {
-      streamId,
-      eventType: 'TOPPED_UP',
-      amount,
-      transactionHash: event.txHash,
-      ledgerSequence: event.ledger,
-      timestamp,
-      metadata: JSON.stringify({ newDepositedAmount }),
-    },
-  });
-});
-
-sseService.broadcastToStream(String(streamId), 'stream.topped_up', {
-  streamId,
-  amount,
-  newDepositedAmount,
-  transactionHash: event.txHash,
-  ledger: event.ledger,
-  timestamp,
-});
-
-logger.info(
-  `[SorobanWorker] StreamToppedUp — stream #${streamId}, amount: ${amount}`,
-);
-  }
-
-  /**
-   * TokensWithdrawnEvent
-   * Topics : [Symbol("tokens_withdrawn"), U64(stream_id)]
-   * Body   : Map { stream_id, recipient, amount, timestamp }
-   */
-  private async handleTokensWithdrawn(
-  event: SorobanRpc.Api.EventResponse,
-  streamIdTopic: xdr.ScVal,
-): Promise < void> {
-  const streamId = Number(decodeU64(streamIdTopic));
-  const body = decodeMap(event.value);
-
-  if(!body['recipient'] || !body['amount'] || !body['timestamp']) {
-  throw new Error(`TokensWithdrawn #${streamId}: missing body fields`);
-}
-
-const recipient = decodeAddress(body['recipient']);
-const amount = decodeI128(body['amount']);
-const timestamp = Number(decodeU64(body['timestamp']));
-
-await prisma.$transaction(async (tx: any) => {
-  // Accumulate the withdrawn total.
-  const stream = await tx.stream.findUniqueOrThrow({
-    where: { streamId },
-    select: { withdrawnAmount: true },
-  });
-
-  const newWithdrawnAmount = (
-    BigInt(stream.withdrawnAmount) + BigInt(amount)
-  ).toString();
-
-  await tx.stream.update({
-    where: { streamId },
-    data: {
-      withdrawnAmount: newWithdrawnAmount,
-      lastUpdateTime: timestamp,
-    },
-  });
-
-  await tx.streamEvent.create({
-    data: {
-      streamId,
-      eventType: 'WITHDRAWN',
-      amount,
-      transactionHash: event.txHash,
-      ledgerSequence: event.ledger,
-      timestamp,
-      metadata: JSON.stringify({ recipient }),
-    },
-  });
-});
-
-sseService.broadcastToStream(String(streamId), 'stream.withdrawn', {
-  streamId,
-  recipient,
-  amount,
-  transactionHash: event.txHash,
-  ledger: event.ledger,
-  timestamp,
-});
-
-logger.info(
-  `[SorobanWorker] TokensWithdrawn — stream #${streamId}, amount: ${amount}`,
-);
-  }
-
-  /**
-   * StreamCancelledEvent
-   * Topics : [Symbol("stream_cancelled"), U64(stream_id)]
-   * Body   : Map { stream_id, sender, recipient, amount_withdrawn,
-   *                refunded_amount }
-   */
-  private async handleStreamCancelled(
-  event: SorobanRpc.Api.EventResponse,
-  streamIdTopic: xdr.ScVal,
-): Promise < void> {
-  const streamId = Number(decodeU64(streamIdTopic));
-  const body = decodeMap(event.value);
-
-  if(!body['amount_withdrawn'] || !body['refunded_amount']) {
-  throw new Error(`StreamCancelled #${streamId}: missing body fields`);
-}
-
-const amountWithdrawn = decodeI128(body['amount_withdrawn']);
-const refundedAmount = decodeI128(body['refunded_amount']);
-const timestamp = Math.floor(Date.now() / 1000);
-
-await prisma.$transaction(async (tx: any) => {
-  await tx.stream.update({
-    where: { streamId },
-    data: {
-      isActive: false,
-      withdrawnAmount: amountWithdrawn,
-      lastUpdateTime: timestamp,
-    },
-  });
-
-  await tx.streamEvent.create({
-    data: {
-      streamId,
-      eventType: 'CANCELLED',
-      amount: refundedAmount,
-      transactionHash: event.txHash,
-      ledgerSequence: event.ledger,
-      timestamp,
-      metadata: JSON.stringify({ amountWithdrawn, refundedAmount }),
-    },
-  });
-});
-
-sseService.broadcastToStream(String(streamId), 'stream.cancelled', {
-  streamId,
-  refundedAmount,
-  amountWithdrawn,
-  transactionHash: event.txHash,
-  ledger: event.ledger,
-  timestamp,
-});
-
-logger.info(`[SorobanWorker] StreamCancelled — stream #${streamId}`);
   }
 }
 
