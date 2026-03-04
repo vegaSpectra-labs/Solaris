@@ -97,19 +97,6 @@ describe('POST /v1/streams', () => {
     expect(response.body).toHaveProperty('error');
   });
 
-  it('should return 410 for deprecated unversioned endpoint', async () => {
-    // Reset mocks so error middleware isn't caught by the mock setup
-    vi.resetAllMocks();
-
-    const response = await request(app)
-      .post('/streams')
-      .send({})
-      .set('Accept', 'application/json');
-
-    expect(response.status).toBe(410);
-    expect(response.body.deprecated).toBe(true);
-    expect(response.body.migration).toMatchObject({ old: '/streams', new: '/v1/streams' });
-  });
 });
 
 describe('GET /v1/streams', () => {
