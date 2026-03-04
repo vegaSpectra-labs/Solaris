@@ -71,6 +71,12 @@ jobs:
         run: npx prisma generate
         working-directory: backend
 
+      - name: Push Database Schema
+        run: npx prisma db push --skip-generate
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://user:password@localhost:5432/flowfi_test
+
       - name: Build
         run: npm run build
         working-directory: backend
