@@ -72,7 +72,7 @@ jobs:
         working-directory: backend
 
       - name: Push Database Schema
-        run: npx prisma db push --skip-generate
+        run: npx prisma db push --skip-generate --schema=prisma/schema.prisma --accept-data-loss
         working-directory: backend
         env:
           DATABASE_URL: postgresql://user:password@localhost:5432/flowfi_test
