@@ -12,14 +12,14 @@ use soroban_sdk::{contract, contractimpl, token, vec, Address, Env, InvokeError,
 
 use errors::StreamError;
 use events::{
-    FeeCollectedEvent, StreamCancelledEvent, StreamCreatedEvent, StreamToppedUpEvent,
-    TokensWithdrawnEvent,
+    FeeCollectedEvent, StreamCancelledEvent, StreamCompletedEvent, StreamCreatedEvent,
+    StreamPausedEvent, StreamResumedEvent, StreamToppedUpEvent, TokensWithdrawnEvent,
 };
 use storage::{
     config_exists, load_config, load_stream, next_stream_id, save_config, save_stream,
     try_load_config, try_load_stream,
 };
-use types::{ProtocolConfig, Stream};
+use types::{ProtocolConfig, Stream, StreamStatus};
 
 /// Maximum allowed protocol fee: 1 000 bps = 10%.
 const MAX_FEE_RATE_BPS: u32 = 1_000;
@@ -157,6 +157,9 @@ impl StreamContract {
                 start_time,
                 last_update_time: start_time,
                 is_active: true,
+                paused: false,
+                paused_at: None,
+                status: StreamStatus::Active,
             },
         );
 
@@ -248,17 +251,15 @@ impl StreamContract {
 
     /// Calculate the claimable amount for a stream at a given timestamp.
     ///
-    /// This helper computes how many tokens have been streamed since the last
-    /// update, capped at the remaining balance to prevent over-withdrawal.
-    ///
-    /// # Arguments
-    /// * `stream` - The stream to calculate claimable amount for
-    /// * `now` - Current ledger timestamp
-    ///
-    /// # Returns
-    /// The amount of tokens that can be claimed, never exceeding remaining balance
+    /// Excludes any time the stream was paused. If the stream is currently
+    /// paused, accrual stops at `paused_at`.
     fn calculate_claimable(stream: &Stream, now: u64) -> i128 {
-        let elapsed = now.saturating_sub(stream.last_update_time);
+        let effective_now = if stream.paused {
+            stream.paused_at.unwrap_or(stream.last_update_time)
+        } else {
+            now
+        };
+        let elapsed = effective_now.saturating_sub(stream.last_update_time);
 
         let streamed = (elapsed as i128)
             .checked_mul(stream.rate_per_second)
@@ -315,9 +316,10 @@ impl StreamContract {
         stream.withdrawn_amount += amount;
         stream.last_update_time = now;
 
-        // Mark stream as inactive if fully drained
+        // Mark stream as inactive and completed if fully drained
         if stream.withdrawn_amount >= stream.deposited_amount {
             stream.is_active = false;
+            stream.status = StreamStatus::Completed;
         }
     }
 
@@ -342,8 +344,11 @@ impl StreamContract {
             return Err(StreamError::Unauthorized);
         }
         
-        // Validate stream is active
+        // Validate stream is active and not paused
         Self::validate_stream_active(&stream)?;
+        if stream.paused {
+            return Err(StreamError::StreamInactive);
+        }
 
         let now = env.ledger().timestamp();
         let claimable = Self::calculate_claimable(&stream, now);
@@ -355,18 +360,30 @@ impl StreamContract {
         // Use helper function to transfer tokens and update state
         Self::transfer_and_update_stream(&env, &mut stream, &recipient, claimable, now);
 
+        let completed = stream.status == StreamStatus::Completed;
         save_stream(&env, stream_id, &stream);
 
-        // Emit withdrawal event
         env.events().publish(
             (Symbol::new(&env, "tokens_withdrawn"), stream_id),
             TokensWithdrawnEvent {
                 stream_id,
-                recipient,
+                recipient: recipient.clone(),
                 amount: claimable,
                 timestamp: stream.last_update_time,
             },
         );
+
+        // Emit COMPLETED event on final withdrawal
+        if completed {
+            env.events().publish(
+                (Symbol::new(&env, "stream_completed"), stream_id),
+                StreamCompletedEvent {
+                    stream_id,
+                    recipient,
+                    total_withdrawn: stream.withdrawn_amount,
+                },
+            );
+        }
 
         Ok(claimable)
     }
@@ -413,6 +430,7 @@ impl StreamContract {
 
         // Mark stream as inactive
         stream.is_active = false;
+        stream.status = StreamStatus::Cancelled;
         stream.last_update_time = now;
 
         let recipient = stream.recipient.clone();
@@ -435,11 +453,96 @@ impl StreamContract {
         Ok(())
     }
 
+    /// Pause an active stream. Only the sender may pause.
+    ///
+    /// # Errors
+    /// - `StreamNotFound`  — no stream exists with `stream_id`.
+    /// - `Unauthorized`    — caller is not the stream's sender.
+    /// - `StreamInactive`  — stream is already inactive.
+    pub fn pause_stream(env: Env, sender: Address, stream_id: u64) -> Result<(), StreamError> {
+        sender.require_auth();
+
+        let mut stream = load_stream(&env, stream_id)?;
+        Self::validate_stream_ownership(&stream, &sender)?;
+        Self::validate_stream_active(&stream)?;
+
+        if stream.paused {
+            return Err(StreamError::StreamInactive);
+        }
+
+        let now = env.ledger().timestamp();
+        stream.paused = true;
+        stream.paused_at = Some(now);
+        stream.status = StreamStatus::Paused;
+        save_stream(&env, stream_id, &stream);
+
+        env.events().publish(
+            (Symbol::new(&env, "stream_paused"), stream_id),
+            StreamPausedEvent { stream_id, sender, paused_at: now },
+        );
+
+        Ok(())
+    }
+
+    /// Resume a paused stream. Adjusts `end_time` by the pause duration.
+    ///
+    /// The `last_update_time` is advanced to `now` so that accrual resumes
+    /// from the current moment, effectively extending the stream by the
+    /// duration it was paused.
+    ///
+    /// # Errors
+    /// - `StreamNotFound`  — no stream exists with `stream_id`.
+    /// - `Unauthorized`    — caller is not the stream's sender.
+    /// - `StreamInactive`  — stream is not paused (already active or cancelled).
+    pub fn resume_stream(env: Env, sender: Address, stream_id: u64) -> Result<u64, StreamError> {
+        sender.require_auth();
+
+        let mut stream = load_stream(&env, stream_id)?;
+        Self::validate_stream_ownership(&stream, &sender)?;
+
+        if !stream.paused {
+            return Err(StreamError::StreamInactive);
+        }
+
+        let now = env.ledger().timestamp();
+        let paused_at = stream.paused_at.unwrap_or(now);
+        let pause_duration = now.saturating_sub(paused_at);
+
+        // Advance last_update_time by pause duration so accrual resumes from now.
+        stream.last_update_time = stream.last_update_time.saturating_add(pause_duration);
+        // new_end_time represents when the stream will fully drain from now.
+        let remaining = stream.deposited_amount.saturating_sub(stream.withdrawn_amount);
+        let new_end_time = if stream.rate_per_second > 0 {
+            now + (remaining / stream.rate_per_second) as u64
+        } else {
+            now
+        };
+
+        stream.paused = false;
+        stream.paused_at = None;
+        stream.status = StreamStatus::Active;
+        save_stream(&env, stream_id, &stream);
+
+        env.events().publish(
+            (Symbol::new(&env, "stream_resumed"), stream_id),
+            StreamResumedEvent { stream_id, sender, new_end_time },
+        );
+
+        Ok(new_end_time)
+    }
+
     // ─── Read-only Queries ────────────────────────────────────────────────────
 
     /// Returns the stream record for `stream_id`, or `None` if it does not exist.
     pub fn get_stream(env: Env, stream_id: u64) -> Option<Stream> {
         try_load_stream(&env, stream_id)
+    }
+
+    /// Returns `true` if the stream exists and has status `Completed`.
+    pub fn is_stream_completed(env: Env, stream_id: u64) -> bool {
+        try_load_stream(&env, stream_id)
+            .map(|s| s.status == StreamStatus::Completed)
+            .unwrap_or(false)
     }
 
     /// Get the current claimable amount for a stream without modifying state.

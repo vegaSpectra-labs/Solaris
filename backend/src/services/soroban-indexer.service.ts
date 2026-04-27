@@ -22,7 +22,7 @@ interface RpcResponse {
   };
 }
 
-type IndexedEventType = 'CREATED' | 'CANCELLED' | 'WITHDRAWN';
+type IndexedEventType = 'CREATED' | 'CANCELLED' | 'WITHDRAWN' | 'COMPLETED';
 
 const RPC_URL = process.env.SOROBAN_RPC_URL ?? 'https://soroban-testnet.stellar.org';
 const POLL_MS = Number(process.env.SOROBAN_INDEXER_POLL_MS ?? 15000);
@@ -112,6 +112,7 @@ export class SorobanIndexerService {
     if (firstTopic.includes('stream_created')) return 'CREATED';
     if (firstTopic.includes('stream_cancelled')) return 'CANCELLED';
     if (firstTopic.includes('tokens_withdrawn')) return 'WITHDRAWN';
+    if (firstTopic.includes('stream_completed')) return 'COMPLETED';
     return null;
   }
 
@@ -222,6 +223,11 @@ export class SorobanIndexerService {
           },
         });
       }
+    } else if (eventType === 'COMPLETED') {
+      await prisma.stream.updateMany({
+        where: { streamId },
+        data: { isActive: false, lastUpdateTime: timestamp },
+      });
     }
 
     await prisma.streamEvent.create({

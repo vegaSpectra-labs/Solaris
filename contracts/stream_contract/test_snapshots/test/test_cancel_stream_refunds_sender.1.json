@@ -371,6 +371,20 @@
                     },
                     {
                       "key": {
+                        "symbol": "paused"
+                      },
+                      "val": {
+                        "bool": false
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "paused_at"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "rate_per_second"
                       },
                       "val": {
@@ -402,6 +416,18 @@
                       },
                       "val": {
                         "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "status"
+                      },
+                      "val": {
+                        "vec": [
+                          {
+                            "symbol": "Cancelled"
+                          }
+                        ]
                       }
                     },
                     {

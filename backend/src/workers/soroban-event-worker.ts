@@ -238,6 +238,9 @@ export class SorobanEventWorker {
       case 'stream_cancelled':
         await this.handleStreamCancelled(event, topic1);
         break;
+      case 'stream_completed':
+        await this.handleStreamCompleted(event, topic1);
+        break;
       default:
         // Unrecognised event — ignore silently.
         break;
@@ -478,6 +481,54 @@ export class SorobanEventWorker {
       streamId,
       refundedAmount,
       amountWithdrawn,
+      transactionHash: event.txHash,
+      ledger: event.ledger,
+      timestamp,
+    });
+  }
+
+  private async handleStreamCompleted(
+    event: rpc.Api.EventResponse,
+    streamIdTopic: xdr.ScVal,
+  ): Promise<void> {
+    const streamId = Number(decodeU64(streamIdTopic));
+    const body = decodeMap(event.value);
+
+    if (!body['recipient'] || !body['total_withdrawn']) {
+      throw new Error(`StreamCompleted #${streamId}: missing body fields`);
+    }
+
+    const recipient = decodeAddress(body['recipient']);
+    const totalWithdrawn = decodeI128(body['total_withdrawn']);
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.stream.update({
+        where: { streamId },
+        data: {
+          isActive: false,
+          withdrawnAmount: totalWithdrawn,
+          lastUpdateTime: timestamp,
+        },
+      });
+
+      await tx.streamEvent.create({
+        data: {
+          streamId,
+          eventType: 'COMPLETED',
+          amount: totalWithdrawn,
+          transactionHash: event.txHash,
+          ledgerSequence: event.ledger,
+          timestamp,
+          metadata: JSON.stringify({ recipient }),
+        },
+      });
+    });
+
+    sseService.broadcastToStream(String(streamId), 'stream.completed', {
+      streamId,
+      recipient,
+      totalWithdrawn,
       transactionHash: event.txHash,
       ledger: event.ledger,
       timestamp,
