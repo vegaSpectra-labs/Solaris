@@ -23,7 +23,8 @@ flowfi/
 │   ├── stream_contract/  # Core streaming logic
 ├── frontend/             # Next.js + Tailwind CSS frontend
 ├── docs/                 # Documentation
-│   └── ARCHITECTURE.md   # Architecture overview
+│   ├── ARCHITECTURE.md   # Architecture overview
+│   └── DEVELOPMENT.md    # Local development guide
 ```
 
 ## Architecture
@@ -37,6 +38,8 @@ FlowFi consists of three main components that work together:
 For a detailed explanation of how these components interact, where event indexing happens, and the overall system architecture, see the [Architecture Documentation](docs/ARCHITECTURE.md).
 
 ## Getting Started
+
+For full step-by-step instructions, see our [Development Guide](docs/DEVELOPMENT.md).
 
 ### Prerequisites
 
