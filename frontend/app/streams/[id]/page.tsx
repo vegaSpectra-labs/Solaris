@@ -46,9 +46,11 @@ export default function StreamDetailsPage() {
     // This would normally come from a wallet provider context
     // For now, we'll use a mock session
     setSession({
+      walletId: "freighter",
       publicKey: "GD...",
       network: "TESTNET",
       walletName: "Freighter",
+      connectedAt: new Date().toISOString(),
       mocked: true,
     });
   }, []);
