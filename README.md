@@ -37,6 +37,8 @@ FlowFi consists of three main components that work together:
 
 For a detailed explanation of how these components interact, where event indexing happens, and the overall system architecture, see the [Architecture Documentation](docs/ARCHITECTURE.md).
 
+For full local setup and contributor onboarding, see the [Development Guide](docs/DEVELOPMENT.md).
+
 ## Getting Started
 
 For full step-by-step instructions, see our [Development Guide](docs/DEVELOPMENT.md).
@@ -179,6 +181,8 @@ Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) 
 - Code style and commit guidelines
 - Pull request process
 - Development scripts and CI workflows
+
+Before your first change, run through the [Development Guide](docs/DEVELOPMENT.md) and review [Architecture Documentation](docs/ARCHITECTURE.md).
 
 For architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

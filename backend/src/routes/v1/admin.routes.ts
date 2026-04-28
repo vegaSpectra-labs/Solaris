@@ -7,10 +7,107 @@ import {
   replayFromLedger,
 } from '../../services/indexerService.js';
 
+import { prisma } from '../../lib/prisma.js';
+import { sseService } from '../../services/sse.service.js';
+import logger from '../../logger.js';
+
 const router = Router();
 
 // All admin routes require admin JWT
 router.use(requireAdmin);
+
+/**
+ * @openapi
+ * /v1/admin/metrics:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Protocol health metrics
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Protocol health metrics
+ */
+router.get('/metrics', async (_req: Request, res: Response) => {
+  try {
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [activeCount, totalCount, cancelledCount, completedCount, eventsLast24h, indexerState, feeEvents, feesLast24h] =
+      await Promise.all([
+        prisma.stream.count({ where: { isActive: true } }),
+        prisma.stream.count(),
+        prisma.stream.count({
+          where: { isActive: false, events: { some: { eventType: 'CANCELLED' } } },
+        }),
+        prisma.stream.count({
+          where: { isActive: false, events: { some: { eventType: 'COMPLETED' } } },
+        }),
+        prisma.streamEvent.count({ where: { createdAt: { gte: since24h } } }),
+        prisma.indexerState.findUnique({ where: { id: 'singleton' } }),
+        prisma.streamEvent.findMany({
+          where: { eventType: 'FEE_COLLECTED' },
+          select: { amount: true, metadata: true },
+        }),
+        prisma.streamEvent.findMany({
+          where: { eventType: 'FEE_COLLECTED', createdAt: { gte: since24h } },
+          select: { amount: true, metadata: true },
+        }),
+      ]);
+
+    // Aggregate fees by token
+    const totalFeesCollectedByToken: Record<string, string> = {};
+    const feesLast24hByToken: Record<string, string> = {};
+
+    for (const event of feeEvents) {
+      const metadata = event.metadata ? JSON.parse(event.metadata) : {};
+      const token = metadata.token || 'unknown';
+      const amount = BigInt(event.amount || '0');
+      totalFeesCollectedByToken[token] = (
+        BigInt(totalFeesCollectedByToken[token] || '0') + amount
+      ).toString();
+    }
+
+    for (const event of feesLast24h) {
+      const metadata = event.metadata ? JSON.parse(event.metadata) : {};
+      const token = metadata.token || 'unknown';
+      const amount = BigInt(event.amount || '0');
+      feesLast24hByToken[token] = (
+        BigInt(feesLast24hByToken[token] || '0') + amount
+      ).toString();
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const lagSeconds = indexerState
+      ? nowSec - Math.floor(indexerState.updatedAt.getTime() / 1000)
+      : null;
+
+    res.json({
+      streams: {
+        active: activeCount,
+        total: totalCount,
+        byStatus: {
+          active: activeCount,
+          cancelled: cancelledCount,
+          completed: completedCount,
+        },
+      },
+      events: { last24h: eventsLast24h },
+      fees: {
+        totalFeesCollectedByToken,
+        feesLast24h: feesLast24hByToken,
+      },
+      sse: { activeConnections: sseService.getClientCount() },
+      indexer: {
+        lastLedger: indexerState?.lastLedger ?? 0,
+        lagSeconds,
+        lastUpdated: indexerState?.updatedAt ?? null,
+      },
+      uptime: process.uptime(),
+    });
+  } catch (err) {
+    logger.error('Error fetching admin metrics:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 /**
  * @openapi
