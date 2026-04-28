@@ -459,10 +459,6 @@ export function DashboardView({ session, onDisconnect }: DashboardViewProps) {
     setStreamFormMessage(null);
   };
 
-  const handleTopUp = (stream: Stream) => {
-    setModal({ type: "topup", stream });
-  };
-
   const handleApplyTemplate = (templateId: string) => {
     const template = templates.find((item) => item.id === templateId);
     if (!template) return;
@@ -792,7 +788,7 @@ export function DashboardView({ session, onDisconnect }: DashboardViewProps) {
           </div>
           <h2 className="text-2xl font-bold mb-2">Start your first stream</h2>
           <p className="text-slate-400 text-center max-w-md mb-8">
-            You haven't created or received any payment streams yet. 
+            You haven&apos;t created or received any payment streams yet. 
             Connect with others and start streaming tokens in real-time.
           </p>
           <Button onClick={() => setShowWizard(true)} glow size="lg">
