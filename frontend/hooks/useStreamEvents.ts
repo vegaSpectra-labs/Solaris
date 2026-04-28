@@ -40,7 +40,7 @@ export function useStreamEvents(
 
   const eventSourceRef = useRef<EventSource | null>(null);
   const retryDelayRef = useRef(1000);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectRef = useRef<() => void>(() => undefined);
 
   const buildUrl = useCallback(() => {
