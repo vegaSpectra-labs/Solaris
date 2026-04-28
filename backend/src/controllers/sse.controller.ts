@@ -9,6 +9,10 @@ const subscribeSchema = z.object({
 });
 
 export const subscribe = (req: Request, res: Response) => {
+  if (sseService.isShuttingDown()) {
+    return res.status(503).json({ message: 'Server is shutting down, please reconnect shortly.' });
+  }
+
   try {
     const { streams, users, all } = subscribeSchema.parse(req.query);
     
