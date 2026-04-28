@@ -10,7 +10,7 @@ const INDEXER_STATE_ID = 'singleton';
 // ─── XDR Decoding Helpers ────────────────────────────────────────────────────
 
 /** Decode an ScVal symbol to a string. */
-function decodeSymbol(val: xdr.ScVal): string {
+export function decodeSymbol(val: xdr.ScVal): string {
   return val.sym().toString();
 }
 
@@ -18,7 +18,7 @@ function decodeSymbol(val: xdr.ScVal): string {
  * Decode an ScVal U64 to a JavaScript bigint.
  * `xdr.UInt64` extends Long; `.toString()` gives the decimal representation.
  */
-function decodeU64(val: xdr.ScVal): bigint {
+export function decodeU64(val: xdr.ScVal): bigint {
   return BigInt(val.u64().toString());
 }
 
@@ -27,7 +27,7 @@ function decodeU64(val: xdr.ScVal): bigint {
  * I128 in XDR is split into hi (signed Int64) and lo (unsigned Uint64).
  * Full value = hi * 2^64 + lo.
  */
-function decodeI128(val: xdr.ScVal): string {
+export function decodeI128(val: xdr.ScVal): string {
   const parts = val.i128();
   const hi = BigInt.asIntN(64, BigInt(parts.hi().toString()));
   const lo = BigInt.asUintN(64, BigInt(parts.lo().toString()));
@@ -38,7 +38,7 @@ function decodeI128(val: xdr.ScVal): string {
  * Decode an ScVal Address to a Stellar public key (G...) or contract (C...)
  * string.
  */
-function decodeAddress(val: xdr.ScVal): string {
+export function decodeAddress(val: xdr.ScVal): string {
   const addr = val.address();
   if (
     addr.switch().value ===
@@ -54,7 +54,7 @@ function decodeAddress(val: xdr.ScVal): string {
  * Decode an ScVal Map (a `#[contracttype]` struct) into a plain object keyed
  * by field name with raw ScVal values for further decoding.
  */
-function decodeMap(val: xdr.ScVal): Record<string, xdr.ScVal> {
+export function decodeMap(val: xdr.ScVal): Record<string, xdr.ScVal> {
   const result: Record<string, xdr.ScVal> = {};
   const entries = val.map();
   if (!entries) return result;
