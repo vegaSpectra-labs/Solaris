@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { StreamListSkeleton } from "../ui/Skeleton";
 
 /**
  * components/dashboard/dashboard-view.tsx
@@ -760,9 +761,9 @@ export function DashboardView({ session, onDisconnect }: DashboardViewProps) {
     if (activeTab === "incoming") {
       if (isSnapshotLoading) {
         return (
-          <div className="dashboard-empty-state mt-8">
-            <h2>Loading streams...</h2>
-            <p>Fetching your incoming streams from the backend API.</p>
+          <div className="dashboard-empty-state mt-8 border-none bg-transparent shadow-none">
+            <h2 className="mb-4 text-left">Loading incoming streams...</h2>
+            <StreamListSkeleton />
           </div>
         );
       }
@@ -790,9 +791,9 @@ export function DashboardView({ session, onDisconnect }: DashboardViewProps) {
     if (activeTab === "overview") {
       if (isSnapshotLoading) {
         return (
-          <section className="dashboard-empty-state">
-            <h2>Loading dashboard...</h2>
-            <p>Fetching active and incoming streams from the backend API.</p>
+          <section className="dashboard-empty-state border-none bg-transparent shadow-none mt-8">
+            <h2 className="mb-4 text-left">Loading dashboard...</h2>
+            <StreamListSkeleton />
           </section>
         );
       }
