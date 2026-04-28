@@ -84,33 +84,12 @@ export const ActivityHistory: React.FC<ActivityHistoryProps> = ({ events, isLoad
                             {event.eventType}
                         </div>
                     </div>
-                    {event.amount && (
-                        <div className="mb-2 text-sm text-slate-300">
-                            Amount: <span className="font-mono font-semibold">{fromStroops(BigInt(event.amount), 7)}</span>
-                        </div>
-                    )}
-                    {event.txHash && (
-                        <div className="flex items-center gap-2 text-xs">
-                            <span className="text-slate-400">Tx:</span>
-                            <a
-                                href={`https://stellar.expert/explorer/testnet/tx/${event.txHash}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-accent hover:underline font-mono truncate max-w-xs"
-                            >
-                                {event.txHash}
-                            </a>
-                            <svg className="w-3 h-3 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                        </div>
-                    )}
-                    {(event.txHash || event.transactionStatus) && (
+                    {event.transactionHash && (
                         <div className="mt-3">
                             <TransactionTracker
-                                status={event.transactionStatus || 'confirmed'}
-                                txHash={event.txHash}
-                                streamId={event.streamId}
+                                status="confirmed"
+                                txHash={event.transactionHash}
+                                streamId={event.streamId.toString()}
                             />
                         </div>
                     )}
