@@ -507,13 +507,10 @@ export default function StreamDetailsPage() {
                 status={pauseResumeStatus}
                 txHash={pauseResumeTxHash}
                 error={pauseResumeError}
-                onRetry={
-                  pauseResumeStatus === "failed"
-                    ? stream.isPaused
-                      ? handleResume
-                      : handlePause
-                    : undefined
                 }
+              />
+            </div>
+          )}
           {withdrawStatus !== "idle" && (
             <div style={{ marginTop: "1rem" }}>
               <TransactionTracker

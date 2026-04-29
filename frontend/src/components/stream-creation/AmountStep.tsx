@@ -1,6 +1,6 @@
 "use client";
 import React, { useRef, useEffect } from "react";
-import { hasValidPrecision, toStroops } from "@/lib/amount";
+import { hasValidPrecision } from "@/lib/amount";
 
 interface AmountStepProps {
   value: string;

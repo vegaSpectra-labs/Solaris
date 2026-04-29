@@ -7,10 +7,10 @@
  * Collects an amount, shows a confirmation summary, and calls onConfirm.
  */
 
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { Button } from "@/components/ui/Button";
-import { hasValidPrecision, toStroops } from "@/lib/amount";
+import { hasValidPrecision } from "@/lib/amount";
 
 interface TopUpModalProps {
   streamId: string;

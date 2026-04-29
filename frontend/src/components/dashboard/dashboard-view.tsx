@@ -27,7 +27,6 @@ import {
   isExpectedNetwork,
   type WalletSession,
 } from "@/lib/wallet";
-import { toStroops } from "@/lib/amount";
 import {
   createStream as sorobanCreateStream,
   topUpStream as sorobanTopUp,
