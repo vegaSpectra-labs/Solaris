@@ -8,9 +8,10 @@ import {
   getUserStreamSummary,
   pauseStream,
   resumeStream,
-  withdrawStream,
 } from '../../controllers/stream.controller.js';
 import { requireAuth } from '../../middleware/auth.js';
+import { authMiddleware } from '../../middleware/auth.middleware.js';
+import { streamCreationRateLimiter } from '../../middleware/stream-rate-limiter.middleware.js';
 
 const router = Router();
 
@@ -393,35 +394,5 @@ router.post('/:streamId/pause', requireAuth, pauseStream);
  */
 router.post('/:streamId/resume', requireAuth, resumeStream);
 
-/**
- * @openapi
- * /v1/streams/{streamId}/withdraw:
- *   post:
- *     tags:
- *       - Streams
- *     summary: Withdraw claimable balance from a payment stream
- *     description: Withdraws the currently claimable amount. Only the recipient can withdraw.
- *     parameters:
- *       - in: path
- *         name: streamId
- *         required: true
- *         schema:
- *           type: integer
- *         description: On-chain stream ID
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Withdrawal submitted successfully
- *       401:
- *         description: Unauthorized - missing or invalid authentication
- *       403:
- *         description: Forbidden - caller is not the stream recipient
- *       404:
- *         description: Stream not found
- *       409:
- *         description: Conflict - no claimable balance available
- */
-router.post('/:streamId/withdraw', requireAuth, withdrawStream);
 
 export default router;
