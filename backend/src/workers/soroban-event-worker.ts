@@ -193,7 +193,18 @@ export class SorobanEventWorker {
     let lastCursor: string | null = state.lastCursor;
     let lastLedger: number = state.lastLedger;
 
-    for (const event of response.events) {
+    // Sort events so that 'stream_created' events are processed first in the batch.
+    // This ensures that subsequent events (like 'fee_collected') that depend on
+    // the stream existing in the DB can find it.
+    const sortedEvents = [...response.events].sort((a, b) => {
+      const aType = a.topic[0] ? decodeSymbol(a.topic[0]) : '';
+      const bType = b.topic[0] ? decodeSymbol(b.topic[0]) : '';
+      if (aType === 'stream_created' && bType !== 'stream_created') return -1;
+      if (bType === 'stream_created' && aType !== 'stream_created') return 1;
+      return 0;
+    });
+
+    for (const event of sortedEvents) {
       // Only process events from successful contract calls.
       if (!event.inSuccessfulContractCall) continue;
 
@@ -233,7 +244,7 @@ export class SorobanEventWorker {
    * Dispatch a single contract event to the appropriate handler based on the
    * first topic symbol.
    */
-  private async processEvent(
+  public async processEvent(
     event: rpc.Api.EventResponse,
   ): Promise<void> {
     if (!event.topic || event.topic.length < 2) return;
@@ -253,6 +264,12 @@ export class SorobanEventWorker {
         break;
       case 'tokens_withdrawn':
         await this.handleTokensWithdrawn(event, topic1);
+        break;
+      case 'stream_paused':
+        await this.handleStreamPaused(event, topic1);
+        break;
+      case 'stream_resumed':
+        await this.handleStreamResumed(event, topic1);
         break;
       case 'stream_cancelled':
         await this.handleStreamCancelled(event, topic1);
@@ -420,6 +437,88 @@ export class SorobanEventWorker {
       streamId,
       amount,
       newDepositedAmount,
+      transactionHash: event.txHash,
+      ledger: event.ledger,
+      timestamp,
+    });
+  }
+
+  private async handleStreamPaused(
+    event: rpc.Api.EventResponse,
+    streamIdTopic: xdr.ScVal,
+  ): Promise<void> {
+    const streamId = Number(decodeU64(streamIdTopic));
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.stream.update({
+        where: { streamId },
+        data: {
+          isPaused: true,
+          lastPausedAt: timestamp,
+        },
+      });
+
+      await tx.streamEvent.create({
+        data: {
+          streamId,
+          eventType: 'PAUSED',
+          transactionHash: event.txHash,
+          ledgerSequence: event.ledger,
+          timestamp,
+        },
+      });
+    });
+
+    sseService.broadcastToStream(String(streamId), 'stream.paused', {
+      streamId,
+      isPaused: true,
+      transactionHash: event.txHash,
+      ledger: event.ledger,
+      timestamp,
+    });
+  }
+
+  private async handleStreamResumed(
+    event: rpc.Api.EventResponse,
+    streamIdTopic: xdr.ScVal,
+  ): Promise<void> {
+    const streamId = Number(decodeU64(streamIdTopic));
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    await prisma.$transaction(async (tx: any) => {
+      const stream = await tx.stream.findUniqueOrThrow({
+        where: { streamId },
+        select: { totalPausedSeconds: true, lastPausedAt: true },
+      });
+
+      const lastPausedAt = stream.lastPausedAt ?? timestamp;
+      const pausedDuration = Math.max(0, timestamp - lastPausedAt);
+      const nextTotalPausedSeconds = stream.totalPausedSeconds + pausedDuration;
+
+      await tx.stream.update({
+        where: { streamId },
+        data: {
+          isPaused: false,
+          totalPausedSeconds: nextTotalPausedSeconds,
+          lastPausedAt: null,
+        },
+      });
+
+      await tx.streamEvent.create({
+        data: {
+          streamId,
+          eventType: 'RESUMED',
+          transactionHash: event.txHash,
+          ledgerSequence: event.ledger,
+          timestamp,
+        },
+      });
+    });
+
+    sseService.broadcastToStream(String(streamId), 'stream.resumed', {
+      streamId,
+      isPaused: false,
       transactionHash: event.txHash,
       ledger: event.ledger,
       timestamp,
@@ -607,7 +706,7 @@ export class SorobanEventWorker {
     });
 
     // Broadcast to admin channel for treasury reporting
-    sseService.broadcast('stream.fee_collected', {
+    sseService.broadcastToAdmin('stream.fee_collected', {
       streamId,
       treasury,
       feeAmount,
@@ -615,7 +714,7 @@ export class SorobanEventWorker {
       transactionHash: event.txHash,
       ledger: event.ledger,
       timestamp,
-    }, (client) => client.subscriptions.has('admin') || client.subscriptions.has('*'));
+    });
   }
 
   private async handleStreamPaused(
@@ -709,6 +808,126 @@ export class SorobanEventWorker {
           ledgerSequence: event.ledger,
           timestamp,
           metadata: JSON.stringify({ sender, newEndTime, pausedDuration }),
+        },
+      });
+    });
+
+    sseService.broadcastToStream(String(streamId), 'stream.resumed', {
+      streamId,
+      sender,
+      newEndTime,
+      transactionHash: event.txHash,
+      ledger: event.ledger,
+      timestamp,
+    });
+  }
+
+  private async handleStreamPaused(
+    event: rpc.Api.EventResponse,
+    streamIdTopic: xdr.ScVal,
+  ): Promise<void> {
+    const streamId = Number(decodeU64(streamIdTopic));
+    const body = decodeMap(event.value);
+
+    if (!body['sender'] || !body['paused_at']) {
+      throw new Error(`StreamPaused #${streamId}: missing body fields`);
+    }
+
+    const sender = decodeAddress(body['sender']);
+    const pausedAt = Number(decodeU64(body['paused_at']));
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    await prisma.$transaction(async (tx: any) => {
+      // Get current stream to preserve totalPausedDuration
+      const currentStream = await tx.stream.findUniqueOrThrow({
+        where: { streamId },
+        select: { totalPausedDuration: true },
+      });
+
+      await tx.stream.update({
+        where: { streamId },
+        data: {
+          isPaused: true,
+          pausedAt,
+          lastUpdateTime: timestamp,
+        },
+      });
+
+      await tx.streamEvent.create({
+        data: {
+          streamId,
+          eventType: 'PAUSED',
+          transactionHash: event.txHash,
+          ledgerSequence: event.ledger,
+          timestamp,
+          metadata: JSON.stringify({ sender, pausedAt }),
+        },
+      });
+    });
+
+    sseService.broadcastToStream(String(streamId), 'stream.paused', {
+      streamId,
+      sender,
+      pausedAt,
+      transactionHash: event.txHash,
+      ledger: event.ledger,
+      timestamp,
+    });
+  }
+
+  private async handleStreamResumed(
+    event: rpc.Api.EventResponse,
+    streamIdTopic: xdr.ScVal,
+  ): Promise<void> {
+    const streamId = Number(decodeU64(streamIdTopic));
+    const body = decodeMap(event.value);
+
+    if (!body['sender'] || !body['new_end_time']) {
+      throw new Error(`StreamResumed #${streamId}: missing body fields`);
+    }
+
+    const sender = decodeAddress(body['sender']);
+    const newEndTime = Number(decodeU64(body['new_end_time']));
+    const timestamp = Math.floor(Date.now() / 1000);
+
+    await prisma.$transaction(async (tx: any) => {
+      // Get current stream to calculate paused duration
+      const currentStream = await tx.stream.findUniqueOrThrow({
+        where: { streamId },
+        select: { pausedAt: true, totalPausedDuration: true },
+      });
+
+      // Calculate the duration of this pause interval
+      let additionalPausedDuration = 0;
+      if (currentStream.pausedAt) {
+        additionalPausedDuration = timestamp - currentStream.pausedAt;
+      }
+
+      const newTotalPausedDuration = currentStream.totalPausedDuration + additionalPausedDuration;
+
+      await tx.stream.update({
+        where: { streamId },
+        data: {
+          isPaused: false,
+          pausedAt: null,
+          totalPausedDuration: newTotalPausedDuration,
+          lastUpdateTime: timestamp,
+        },
+      });
+
+      await tx.streamEvent.create({
+        data: {
+          streamId,
+          eventType: 'RESUMED',
+          transactionHash: event.txHash,
+          ledgerSequence: event.ledger,
+          timestamp,
+          metadata: JSON.stringify({ 
+            sender, 
+            newEndTime, 
+            pausedDuration: additionalPausedDuration,
+            totalPausedDuration: newTotalPausedDuration 
+          }),
         },
       });
     });
