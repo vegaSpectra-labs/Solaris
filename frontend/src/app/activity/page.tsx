@@ -17,21 +17,7 @@ export default function ActivityPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [activeFilter, setActiveFilter] = useState<EventFilter>('All');
 
-    useEffect(() => {
-        if (session?.publicKey) {
-            loadEvents();
-        }
-    }, [session?.publicKey]);
-
-    useEffect(() => {
-        if (activeFilter === 'All') {
-            setFilteredEvents(events);
-        } else {
-            setFilteredEvents(events.filter(e => e.eventType === activeFilter));
-        }
-    }, [activeFilter, events]);
-
-    const loadEvents = async () => {
+    const loadEvents = useCallback(async () => {
         if (!session?.publicKey) return;
         setIsLoading(true);
         try {
@@ -43,7 +29,21 @@ export default function ActivityPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [session?.publicKey]);
+
+    useEffect(() => {
+        if (session?.publicKey) {
+            loadEvents();
+        }
+    }, [session?.publicKey, loadEvents]);
+
+    useEffect(() => {
+        if (activeFilter === 'All') {
+            setFilteredEvents(events);
+        } else {
+            setFilteredEvents(events.filter(e => e.eventType === activeFilter));
+        }
+    }, [activeFilter, events]);
 
     const handleExportCSV = () => {
         const csvData = filteredEvents.map(event => ({
