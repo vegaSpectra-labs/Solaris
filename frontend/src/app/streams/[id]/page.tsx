@@ -180,7 +180,7 @@ export default function StreamDetailsPage() {
     try {
       await topUpStream(session, {
         streamId: BigInt(streamId),
-        amount: toStroops(topUpAmount, 7),
+        amount: parseAmount(topUpAmount, 7),
       });
       toast.success("Stream topped up successfully!");
       setShowTopUp(false);
