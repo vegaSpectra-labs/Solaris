@@ -28,6 +28,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ publ
         autoReconnect: true
     });
 
+    // Wire up SSE for real-time events
+    const { events: streamEvents } = useStreamEvents({
+        userPublicKeys: [publicKey],
+        autoReconnect: true,
+    });
+
     const formatEventMessage = useCallback((event: { type: string; data?: unknown }): string => {
         const data = event.data as { streamId?: number; amount?: string; tokenSymbol?: string };
         const streamId = data?.streamId || 0;
@@ -54,6 +60,16 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ publ
         }
     }, []);
 
+    // Clear unread count when dropdown opens - use setTimeout to avoid synchronous setState
+    useEffect(() => {
+        if (isOpen) {
+            const timer = setTimeout(() => {
+                setUnreadCount(0);
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+    }, [isOpen]);
+
     // Process live events into notifications
     useEffect(() => {
         if (events && events.length > 0) {
@@ -79,22 +95,46 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ publ
                     });
                 }, 0);
             }
-
-            // Increment unread count for new events while dropdown is closed
-            if (!isOpen) {
-                setUnreadCount(prev => prev + newNotifications.length);
-            }
         }
-    }, [events, formatEventMessage, isOpen]);
+    }, [events, isOpen]);
+
+    // Handle incoming SSE events
+    useEffect(() => {
+        if (streamEvents.length > 0 && !isOpen) {
+            // Increment unread count for new events while dropdown is closed
+            // Use setTimeout to avoid synchronous setState
+            const timer = setTimeout(() => {
+                setUnreadCount(prev => prev + 1);
+            }, 0);
+            return () => clearTimeout(timer);
+        }
+
+        // Future: Process SSE events here if needed
+        // Example: Extract event data and create notifications
+        // if (streamEvents.length > 0) {
+        //     const latestEvent = streamEvents[0];
+        //     const eventData = latestEvent.data as {
+        //         streamId?: number;
+        //         amount?: string;
+        //         feeAmount?: string;
+        //         transactionHash?: string;
+        //         ledger?: number;
+        //     };
+        // }
+    }, [streamEvents, isOpen]);
+
+    // Calculate unread count from notifications
+    const calculatedUnreadCount = useMemo(() => {
+        return notifications.filter(n => !n.read).length;
+    }, [notifications]);
 
     // Mark all as read when dropdown opens
     const handleDropdownOpen = useCallback(() => {
         setIsOpen(true);
-        if (unreadCount > 0) {
+        if (calculatedUnreadCount > 0) {
             setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-            setUnreadCount(0);
         }
-    }, [unreadCount]);
+    }, [calculatedUnreadCount]);
 
     return (
         <div className="relative">
@@ -114,7 +154,12 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ publ
                     </span>
                 )}
                 {!connected && (
-                    <span className="absolute bottom-0 right-0 h-2 w-2 bg-red-500 rounded-full border-2 border-background"></span>
+                    <>
+                        <span className="absolute bottom-0 right-0 h-2 w-2 bg-red-500 rounded-full border-2 border-background"></span>
+                        <span className="absolute top-0 right-0 h-5 w-5 bg-accent rounded-full border-2 border-background flex items-center justify-center text-xs font-bold text-white">
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                    </>
                 )}
             </button>
 
