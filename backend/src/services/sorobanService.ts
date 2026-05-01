@@ -3,6 +3,7 @@ import logger from '../logger.js';
 
 const RPC_URL = process.env.SOROBAN_RPC_URL ?? 'https://soroban-testnet.stellar.org';
 const CONTRACT_ID = process.env.STREAM_CONTRACT_ID ?? '';
+const KEEPER_SECRET = process.env.KEEPER_SECRET_KEY ?? '';
 /** DB data older than this is considered stale and triggers an RPC fallback. */
 const STALE_THRESHOLD_MS = 30_000;
 
