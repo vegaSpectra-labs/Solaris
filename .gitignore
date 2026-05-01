@@ -1,0 +1,10 @@
+node_modules
+dist
+target
+.env
+.DS_Store
+coverage
+*.log
+
+# Soroban test runner — auto-generated, never commit
+**/test_snapshots/
